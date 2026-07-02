@@ -1,0 +1,3 @@
+python-vlc>=3.0.20
+mutagen>=1.47.0
+tkinterdnd2>=0.4.2
