@@ -43,7 +43,22 @@ except ImportError:
     _DND_AVAILABLE = False
 
 APP_NAME = "Py Audio Player"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
+
+# --- Winamp-inspired dark skin -------------------------------------------
+C_BG = "#1e1e28"        # window background
+C_PANEL = "#14141c"     # sunken panels / playlist
+C_FG = "#c8c8d4"        # normal text
+C_DIM = "#70708a"       # secondary text
+C_LCD_BG = "#060a06"    # LCD display background
+C_LCD_FG = "#00ff66"    # classic Winamp green
+C_ACCENT = "#00e07f"    # highlights / active toggles
+C_SHUFFLE = "#3fb4ff"   # shuffle-active color
+C_BTN = "#2a2a3a"       # button face
+C_BTN_ACTIVE = "#3a3a52"
+C_SELECT = "#2d3f5e"    # playlist selection
+LCD_FONT = ("Consolas", 18, "bold")
+LCD_FONT_SMALL = ("Consolas", 10, "bold")
 
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma"}
 PLAYLIST_EXTENSIONS = {".m3u", ".m3u8", ".pls"}
@@ -162,6 +177,7 @@ class AudioPlayerApp:
         events.event_attach(vlc.EventType.MediaPlayerEndReached,
                             self._on_track_end)
 
+        self._apply_style()
         self._build_menu()
         self._build_ui()
         self._setup_dnd()
@@ -174,10 +190,48 @@ class AudioPlayerApp:
 
     # ------------------------------------------------------------------ UI
 
-    def _build_menu(self) -> None:
-        menubar = tk.Menu(self.root)
+    def _apply_style(self) -> None:
+        self.root.configure(bg=C_BG)
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
 
-        file_menu = tk.Menu(menubar, tearoff=0)
+        style.configure(".", background=C_BG, foreground=C_FG,
+                        fieldbackground=C_PANEL, bordercolor=C_PANEL,
+                        lightcolor=C_BG, darkcolor=C_BG)
+        style.configure("Treeview", background=C_PANEL, foreground=C_FG,
+                        fieldbackground=C_PANEL, rowheight=22,
+                        font=("Segoe UI", 9), borderwidth=0)
+        style.map("Treeview",
+                  background=[("selected", C_SELECT)],
+                  foreground=[("selected", C_LCD_FG)])
+        style.configure("Treeview.Heading", background=C_BTN,
+                        foreground=C_FG, relief="flat",
+                        font=("Segoe UI", 9, "bold"))
+        style.map("Treeview.Heading", background=[("active", C_BTN_ACTIVE)])
+
+        style.configure("Horizontal.TScale", troughcolor=C_PANEL,
+                        background=C_ACCENT, bordercolor=C_PANEL,
+                        lightcolor=C_ACCENT, darkcolor=C_ACCENT)
+        style.configure("Vertical.TScrollbar", troughcolor=C_PANEL,
+                        background=C_BTN, bordercolor=C_PANEL,
+                        arrowcolor=C_FG)
+        style.map("Vertical.TScrollbar",
+                  background=[("active", C_BTN_ACTIVE)])
+
+    def _make_btn(self, parent, text, command, width=8) -> tk.Button:
+        return tk.Button(
+            parent, text=text, command=command, width=width,
+            bg=C_BTN, fg=C_FG, activebackground=C_BTN_ACTIVE,
+            activeforeground=C_LCD_FG, relief="flat", bd=0,
+            highlightthickness=1, highlightbackground=C_PANEL,
+            font=("Segoe UI", 9), cursor="hand2", padx=4, pady=3)
+
+    def _build_menu(self) -> None:
+        menu_kw = dict(bg=C_PANEL, fg=C_FG, activebackground=C_SELECT,
+                       activeforeground=C_LCD_FG, bd=0)
+        menubar = tk.Menu(self.root, **menu_kw)
+
+        file_menu = tk.Menu(menubar, tearoff=0, **menu_kw)
         file_menu.add_command(label="Open File(s)...", accelerator="Ctrl+O",
                               command=self.add_files)
         file_menu.add_command(label="Add Folder...", command=self.add_folder)
@@ -188,7 +242,7 @@ class AudioPlayerApp:
         file_menu.add_command(label="Exit", command=self.on_close)
         menubar.add_cascade(label="File", menu=file_menu)
 
-        play_menu = tk.Menu(menubar, tearoff=0)
+        play_menu = tk.Menu(menubar, tearoff=0, **menu_kw)
         play_menu.add_command(label="Play", command=self.play)
         play_menu.add_command(label="Pause / Resume", command=self.pause)
         play_menu.add_command(label="Stop", command=self.stop)
@@ -198,7 +252,7 @@ class AudioPlayerApp:
         play_menu.add_command(label="Restart Track", command=self.restart_track)
         menubar.add_cascade(label="Playback", menu=play_menu)
 
-        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu = tk.Menu(menubar, tearoff=0, **menu_kw)
         help_menu.add_command(label="About", command=self.show_about)
         menubar.add_cascade(label="Help", menu=help_menu)
 
@@ -207,9 +261,21 @@ class AudioPlayerApp:
         self.root.bind("<space>", self._space_pressed)
 
     def _build_ui(self) -> None:
+        # --- LCD display panel (Winamp-style) ---
+        lcd = tk.Frame(self.root, bg=C_LCD_BG, bd=2, relief="sunken")
+        lcd.pack(fill="x", padx=8, pady=(8, 4))
+        self.time_label = tk.Label(lcd, text="00:00 / 00:00",
+                                   bg=C_LCD_BG, fg=C_LCD_FG, font=LCD_FONT,
+                                   anchor="w", padx=10)
+        self.time_label.pack(fill="x", pady=(6, 0))
+        self.track_label = tk.Label(lcd, text="*** PY AUDIO PLAYER ***",
+                                    bg=C_LCD_BG, fg=C_LCD_FG,
+                                    font=LCD_FONT_SMALL, anchor="w", padx=10)
+        self.track_label.pack(fill="x", pady=(0, 6))
+
         # --- playlist ---
-        list_frame = ttk.Frame(self.root, padding=(8, 8, 8, 0))
-        list_frame.pack(fill="both", expand=True)
+        list_frame = tk.Frame(self.root, bg=C_BG)
+        list_frame.pack(fill="both", expand=True, padx=8)
 
         columns = ("title", "duration")
         self.tree = ttk.Treeview(list_frame, columns=columns, show="headings",
@@ -228,48 +294,53 @@ class AudioPlayerApp:
         scroll.pack(side="right", fill="y")
 
         # --- playlist management buttons ---
-        pl_bar = ttk.Frame(self.root, padding=(8, 4))
-        pl_bar.pack(fill="x")
+        pl_bar = tk.Frame(self.root, bg=C_BG)
+        pl_bar.pack(fill="x", padx=8, pady=4)
         for text, cmd in (
-            ("Add Files", self.add_files),
-            ("Add Folder", self.add_folder),
-            ("Remove", self.remove_selected),
+            ("+ Files", self.add_files),
+            ("+ Folder", self.add_folder),
+            ("− Remove", self.remove_selected),
             ("Clear", self.clear_playlist),
-            ("Move Up", lambda: self.move_selected(-1)),
-            ("Move Down", lambda: self.move_selected(1)),
+            ("▲ Up", lambda: self.move_selected(-1)),
+            ("▼ Down", lambda: self.move_selected(1)),
         ):
-            ttk.Button(pl_bar, text=text, command=cmd).pack(side="left", padx=2)
+            self._make_btn(pl_bar, text, cmd).pack(side="left", padx=2)
 
-        # --- seek slider + time labels ---
-        seek_frame = ttk.Frame(self.root, padding=(8, 4))
-        seek_frame.pack(fill="x")
-        self.time_label = ttk.Label(seek_frame, text="00:00 / 00:00", width=16)
-        self.time_label.pack(side="right")
+        # --- seek slider ---
+        seek_frame = tk.Frame(self.root, bg=C_BG)
+        seek_frame.pack(fill="x", padx=8, pady=2)
         self.seek_var = tk.DoubleVar(value=0.0)
         self.seek_scale = ttk.Scale(seek_frame, from_=0.0, to=1000.0,
                                     variable=self.seek_var, orient="horizontal")
-        self.seek_scale.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.seek_scale.pack(fill="x", expand=True)
         self.seek_scale.bind("<ButtonPress-1>", self._seek_start)
         self.seek_scale.bind("<ButtonRelease-1>", self._seek_end)
 
         # --- transport controls ---
-        ctrl = ttk.Frame(self.root, padding=(8, 4))
-        ctrl.pack(fill="x")
-        ttk.Button(ctrl, text="⏮ Prev", command=self.previous_track).pack(side="left", padx=2)
-        ttk.Button(ctrl, text="▶ Play", command=self.play).pack(side="left", padx=2)
-        ttk.Button(ctrl, text="⏸ Pause", command=self.pause).pack(side="left", padx=2)
-        ttk.Button(ctrl, text="⏹ Stop", command=self.stop).pack(side="left", padx=2)
-        ttk.Button(ctrl, text="⏭ Next", command=self.next_track).pack(side="left", padx=2)
-        ttk.Button(ctrl, text="↺ Restart", command=self.restart_track).pack(side="left", padx=2)
+        ctrl = tk.Frame(self.root, bg=C_BG)
+        ctrl.pack(fill="x", padx=8, pady=(2, 4))
+        for text, cmd in (
+            ("⏮", self.previous_track),
+            ("▶", self.play),
+            ("⏸", self.pause),
+            ("⏹", self.stop),
+            ("⏭", self.next_track),
+            ("↺", self.restart_track),
+        ):
+            btn = self._make_btn(ctrl, text, cmd, width=4)
+            btn.configure(font=("Segoe UI", 11))
+            btn.pack(side="left", padx=2)
 
-        self.loop_btn = tk.Button(ctrl, text="Loop: OFF", relief="raised",
-                                  command=self.toggle_loop)
+        self.loop_btn = self._make_btn(ctrl, "LOOP", self.toggle_loop, width=7)
+        self.loop_btn.configure(fg=C_DIM)
         self.loop_btn.pack(side="left", padx=(12, 2))
-        self.shuffle_btn = tk.Button(ctrl, text="Shuffle: OFF", relief="raised",
-                                     command=self.toggle_shuffle)
+        self.shuffle_btn = self._make_btn(ctrl, "SHUFFLE", self.toggle_shuffle,
+                                          width=8)
+        self.shuffle_btn.configure(fg=C_DIM)
         self.shuffle_btn.pack(side="left", padx=2)
 
-        ttk.Label(ctrl, text="Vol").pack(side="left", padx=(16, 2))
+        tk.Label(ctrl, text="VOL", bg=C_BG, fg=C_DIM,
+                 font=("Segoe UI", 8, "bold")).pack(side="left", padx=(16, 4))
         self.volume_var = tk.IntVar(value=80)
         self.volume_scale = ttk.Scale(
             ctrl, from_=0, to=100, orient="horizontal", length=120,
@@ -279,8 +350,9 @@ class AudioPlayerApp:
 
         # --- status bar ---
         self.status_var = tk.StringVar(value="Ready — add some audio files.")
-        status = ttk.Label(self.root, textvariable=self.status_var,
-                           relief="sunken", anchor="w", padding=(6, 2))
+        status = tk.Label(self.root, textvariable=self.status_var,
+                          bg=C_PANEL, fg=C_DIM, anchor="w",
+                          font=("Segoe UI", 8), padx=8, pady=3)
         status.pack(fill="x", side="bottom")
 
     def _setup_dnd(self) -> None:
@@ -357,6 +429,7 @@ class AudioPlayerApp:
         self.playlist.clear()
         self.current_index = None
         self.tree.delete(*self.tree.get_children())
+        self.track_label.config(text="*** PY AUDIO PLAYER ***")
         self.status_var.set("Playlist cleared.")
 
     def move_selected(self, delta: int) -> None:
@@ -490,6 +563,7 @@ class AudioPlayerApp:
         self.player.set_media(media)
         self.player.play()
         self._refresh_highlight()
+        self.track_label.config(text=track.name.upper())
         self.status_var.set(f"Playing: {track.name}")
 
     def play(self) -> None:
@@ -558,16 +632,16 @@ class AudioPlayerApp:
     def toggle_loop(self) -> None:
         self.loop_enabled = not self.loop_enabled
         self.loop_btn.config(
-            text=f"Loop: {'ON' if self.loop_enabled else 'OFF'}",
-            relief="sunken" if self.loop_enabled else "raised",
-            bg="#a5d6a7" if self.loop_enabled else "SystemButtonFace")
+            fg=C_LCD_FG if self.loop_enabled else C_DIM,
+            bg=C_BTN_ACTIVE if self.loop_enabled else C_BTN,
+            highlightbackground=C_ACCENT if self.loop_enabled else C_PANEL)
 
     def toggle_shuffle(self) -> None:
         self.shuffle_enabled = not self.shuffle_enabled
         self.shuffle_btn.config(
-            text=f"Shuffle: {'ON' if self.shuffle_enabled else 'OFF'}",
-            relief="sunken" if self.shuffle_enabled else "raised",
-            bg="#90caf9" if self.shuffle_enabled else "SystemButtonFace")
+            fg=C_SHUFFLE if self.shuffle_enabled else C_DIM,
+            bg=C_BTN_ACTIVE if self.shuffle_enabled else C_BTN,
+            highlightbackground=C_SHUFFLE if self.shuffle_enabled else C_PANEL)
 
     def set_volume(self, value: int) -> None:
         self.player.audio_set_volume(int(value))

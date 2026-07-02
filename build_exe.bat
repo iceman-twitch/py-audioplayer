@@ -16,4 +16,4 @@ if not exist venv\Scripts\pyinstaller.exe (
 
 pyinstaller --onefile --windowed --name "Py AudioPlayer" audio_player.py
 echo.
-echo Done. Executable: dist\PyAudioPlayer\PyAudioPlayer.exe
+echo Done. Executable: dist\Py AudioPlayer.exe
