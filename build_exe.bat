@@ -14,6 +14,6 @@ if not exist venv\Scripts\pyinstaller.exe (
     pip install -r requirements-dev.txt
 )
 
-pyinstaller --noconfirm --clean py-audioplayer.spec
+pyinstaller --onefile --windowed --name "Py AudioPlayer" audio_player.py
 echo.
 echo Done. Executable: dist\PyAudioPlayer\PyAudioPlayer.exe
